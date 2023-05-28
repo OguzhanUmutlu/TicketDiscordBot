@@ -1,76 +1,72 @@
-const fs = require("fs");
-const {CategoryChannel, TextChannel} = require("discord.js");
-const {getClient, getEnv} = require("./index");
-if(!fs.readdirSync(".").includes("tickets.json"))
-    fs.writeFileSync("./tickets.json", "{}");
-const tickets = JSON.parse(fs.readFileSync("./tickets.json").toString());
+const {CategoryChannel, TextChannel, PermissionFlagsBits} = require("discord.js");
 
-const TicketManager = new class {
-    getTickets() {
-        return tickets;
+const DB_ERR = false;
+const query = async (sql, ...args) => new Promise(r => db.all(sql, args, (err, rows) => {
+    if (err) {
+        if (DB_ERR) console.err(err);
+        return r([]);
     }
-    getTicket(userId) {
-        return tickets[userId];
+    r(rows);
+}));
+const exec = async (sql, ...args) => new Promise(r => db.run(sql, args, (err, rows) => {
+    if (err) {
+        if (DB_ERR) console.err(err);
+        return r([]);
     }
-    setTicket(userId, data) {
-        tickets[userId] = data;
-        fs.writeFileSync("./tickets.json", JSON.stringify(tickets));
-    }
-    deleteTicket(userId) {
-        delete tickets[userId];
-        fs.writeFileSync("./tickets.json", JSON.stringify(tickets));
-    }
-    async createTicket(userId) {
-        if(this.getTicket(userId)) return -1;
-        const client = getClient();
-        const env = getEnv();
-        const guild = client.guilds.cache.get(env["guildId"]);
-        if(!guild) return -2;
+    r(rows);
+}));
+
+exec(`CREATE TABLE tickets
+      (
+          userId    VARCHAR,
+          channelId VARCHAR
+      )`).then(r => r);
+
+global.TicketManager = new class {
+    async getTicket(userId) {
+        return (await query(`SELECT *
+                             FROM tickets
+                             WHERE userId = ? LIMIT 1`, userId))[0];
+    };
+
+    async addTicket(userId, channelId) {
+        return await exec(`INSERT INTO tickets (userId, channelId)
+                           VALUES (?, ?)`, userId, channelId);
+    };
+
+    async getTicketByChannelId(channelId) {
+        return (await query(`SELECT *
+                             FROM tickets
+                             WHERE channelId = ? LIMIT 1`, channelId))[0];
+    };
+
+    async createTicket(userId, username) {
+        if (await this.getTicket(userId)) return -1;
+        const guild = client.guilds.cache.get(env.guildId);
+        if (!guild) return -2;
         const member = guild.members.cache.get(userId);
-        if(!member) return -3;
-        const category = guild.channels.cache.get(env["categoryId"]);
-        if(!(category instanceof CategoryChannel)) return -4;
+        if (!member) return -3;
+        const category = guild.channels.cache.get(env.categoryId);
+        if (!(category instanceof CategoryChannel)) return -4;
         const permissionOverwrites = [
-            {
-                id: guild.id,
-                deny: ["VIEW_CHANNEL"]
-            },
-            {
-                id: userId,
-                allow: ["VIEW_CHANNEL"]
-            }
+            {id: guild.id, deny: [PermissionFlagsBits.ViewChannel]},
+            {id: userId, allow: [PermissionFlagsBits.ViewChannel]}
         ];
-        env["supportRoles"].split(",").forEach(i=> {
-            permissionOverwrites.push({
-                id: i,
-                allow: ["VIEW_CHANNEL"]
-            });
+        env.supportRoles.split(",").filter(i => i).forEach(i => {
+            permissionOverwrites.push({id: i, allow: [PermissionFlagsBits.ViewChannel]});
         });
-        const channel = await guild.channels.create(userId, {
-            type: "text",
+        const channel = await guild.channels.create({
+            name: username,
             parent: category,
             permissionOverwrites: permissionOverwrites
         });
-        this.setTicket(userId, {
-            userId,
-            channelId: channel.id
-        });
+        await this.addTicket(userId, channel.id);
         return channel;
-    }
+    };
+
     async removeTicket(userId) {
-        if(!this.getTicket(userId)) return -1;
-        const env = getEnv();
-        const guild = getClient().guilds.cache.get(env["guildId"]);
-        if(!guild) return -2;
-        const channel = guild.channels.cache.get(this.getTicket(userId).channelId);
-        this.deleteTicket(userId);
-        if(channel instanceof TextChannel)
-            await channel.delete("Closed ticket.");
-        else return -3;
-        return 1;
-    }
-    getTicketByChannelId(channelId) {
-        return Object.values(tickets).filter(i=> i.channelId === channelId)[0];
-    }
+        return await exec(`DELETE
+                           FROM tickets
+                           WHERE userId = ?`, userId);
+    };
 }
-module.exports = TicketManager;

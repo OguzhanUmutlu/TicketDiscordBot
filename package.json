@@ -11,15 +11,15 @@
     "url": "git+https://github.com/OguzhanUmutlu/TicketDiscordBot.git"
   },
   "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "author": "OguzhanUmutlu",
+  "license": "MIT",
   "bugs": {
     "url": "https://github.com/OguzhanUmutlu/TicketDiscordBot/issues"
   },
   "homepage": "https://github.com/OguzhanUmutlu/TicketDiscordBot#readme",
   "dependencies": {
-    "discord-buttons": "^4.0.0",
-    "discord.js": "^12.5.3",
-    "fs": "^0.0.1-security"
+    "discord.js": "^14.11.0",
+    "fancy-printer": "^1.0.29",
+    "sqlite3": "^5.1.6"
   }
 }
