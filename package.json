@@ -19,7 +19,7 @@
   "homepage": "https://github.com/OguzhanUmutlu/TicketDiscordBot#readme",
   "dependencies": {
     "discord.js": "^14.11.0",
-    "fancy-printer": "^1.0.29",
+    "fancy-printer": "^1.2.55",
     "sqlite3": "^5.1.6"
   }
 }
